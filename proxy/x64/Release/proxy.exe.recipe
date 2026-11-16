@@ -2,7 +2,7 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>D:\Project\log\x64\Release\proxy.exe</FullPath>
+      <FullPath>D:\Project\networkTest\x64\Release\proxy.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />

@@ -130,7 +130,26 @@ int TcpClient(char* sip, int sport,char * cip,int cport) {
 
 
 
+void test() {
+	HANDLE hf = CreateFileA("D:\\vmware\\Fort7.6.6ÐéÄâ»ú\\Fort-disk1.vmdk", GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	if(hf == INVALID_HANDLE_VALUE) {
+		printf("CreateFileA error\r\n");
+		return;
+	}
+
+
+	int fs = GetFileSize(hf, 0);
+
+
+	CloseHandle(hf);
+
+}
+
+
 int main(int argc, char** argv) {
+
+	test();
+	return 0;
 
 	int ret = 0;
 	int seq = 0;

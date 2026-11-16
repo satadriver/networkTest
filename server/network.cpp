@@ -50,7 +50,10 @@ using namespace std;
 
 #pragma pack(1)
 
-
+typedef struct TCPSERVERPARAM {
+	int sock;
+	sockaddr_in sa;
+};
 
 #pragma pack()
 
@@ -60,12 +63,18 @@ using namespace std;
 
 
 void printdata(char* data, int size) {
+	printf("\r\n");
 	for(int i = 0; i < size; i++) {
-		printf("%02x ", (unsigned char)data[i]);
+		unsigned char cc = data[i];
+		printf("%02x ", (unsigned char)cc);
 		if((i+1) % 16 == 0) {
 			printf("\r\n");
 		}
+		else if ((i + 1) % 8 == 0) {
+			printf("  ");
+		}
 	}
+	printf("\r\n");
 }
 
 int  UdpClient(char* ip, int port) {
@@ -334,6 +343,51 @@ int  TcpClient(char* ip,int port) {
 }
 
 
+
+
+
+int __stdcall TcpServerThread(TCPSERVERPARAM* param) {
+
+	int sc = (int)param->sock;
+	sockaddr_in* ca = &param->sa;
+
+	char sendbuf[0x1000] = { 0 };
+
+	int recvBufSize = 0x10000;
+	char* recvbuf = new char[recvBufSize];
+
+	while (1) {
+		int recvlen = recv(sc, recvbuf, recvBufSize - 1, 0);
+		if (recvlen <= 0 || recvlen >= recvBufSize) {
+			memset(recvbuf, 0, recvBufSize);
+			break;
+		}
+		else {
+			recvbuf[recvlen] = 0;
+			char* strip = inet_ntoa(ca->sin_addr);
+			int port = ntohs(ca->sin_port);
+			printf("%s %d recv ip:%s port:%d size:%d,data:%s\r\n",__FUNCTION__, __LINE__, strip, ntohs(ca->sin_port), recvlen, recvbuf);
+			printdata(recvbuf, recvlen);
+			/*
+			HANDLE hf = CreateFileA("tcpsrv.data", GENERIC_WRITE, 0, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+			if (hf != INVALID_HANDLE_VALUE) {
+				int fs = SetFilePointer(hf, 0, 0, FILE_END);
+				DWORD cnt = 0;
+				ret = WriteFile(hf, recvbuf, recvlen, &cnt, 0);
+				CloseHandle(hf);
+			}*/
+		}
+	}
+#ifdef _WIN32
+	closesocket(sc);
+#elif defined(__linux__)
+	close(s);
+#endif
+	delete param;
+	return 0;
+}
+
+
 int  TcpServer(char * ip,int port) {
 
 	int ret = 0;
@@ -368,63 +422,18 @@ int  TcpServer(char * ip,int port) {
 
 	ret = listen(ss, 16);
 
-	char sendbuf[0x1000] = { 0 };
-
-	int recvBufSize = 0x10000;
-	char* recvbuf = new char[recvBufSize];
-	//const char* sh = "220 mx1.sina.com ESMTP Postfix\r\n";
-	const char* sh = "Hello,tcp client,I'm Tcp Server!\r\n";
 	while (1) {
 		sockaddr_in ca;
 		socklen_t sasize = sizeof(sockaddr_in);
 		int sc = accept(ss, (sockaddr*)&ca, &sasize);
 		if (sc != -1) {
+			TCPSERVERPARAM* param = (TCPSERVERPARAM * )new char[sizeof(TCPSERVERPARAM)];
+			memcpy(& param->sa, &ca, sizeof(sockaddr_in));
+			param->sock = sc;
 
-			//strcpy(sendbuf, sh);
-			//int sendlen = send(sc, sendbuf, strlen(sh), 0);
-			//if (sendlen <= 0) {
-			//	break;
-			//}
-			
-			int recvlen = recv(sc, recvbuf, recvBufSize-1, 0);
-			if (recvlen <= 0 || recvlen >= recvBufSize) {
-				memset(recvbuf, 0, recvBufSize);
-#ifdef _WIN32
-				closesocket(sc);
-#elif defined(__linux__)
-				close(s);
-#endif
-			}
-			else {
-				recvbuf[recvlen] = 0;
-				char* strip = inet_ntoa(ca.sin_addr);
-				int port = ntohs(ca.sin_port);
-				printf("%s %d recv ip:%s port:%d size:%d,data:%s\r\n",
-					__FUNCTION__, __LINE__, strip, ntohs(ca.sin_port), recvlen,recvbuf);
-				//printdata(recvbuf, recvlen);
-
-				strcpy(sendbuf, sh);
-				int sendlen = send(sc, sendbuf, strlen(sh), 0);
-				if (sendlen <= 0) {
-					printf("send error\r\n");
-					break;
-				}
-				printf("send data:%s,size:%d ok\r\n",sendbuf,strlen(sendbuf));
-				/*
-				HANDLE hf = CreateFileA("tcpsrv.data", GENERIC_WRITE, 0, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-				if (hf != INVALID_HANDLE_VALUE) {
-					int fs = SetFilePointer(hf, 0, 0, FILE_END);
-					DWORD cnt = 0;
-					ret = WriteFile(hf, recvbuf, recvlen, &cnt, 0);
-					CloseHandle(hf);
-				}*/
-
-#ifdef _WIN32
-				closesocket(sc);
-#elif defined(__linux__)
-				close(s);
-#endif
-			}
+			HANDLE ht = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)TcpServerThread, param, 0, 0);
+			if (ht)
+				CloseHandle(ht);
 		}
 		else {
 			continue;
